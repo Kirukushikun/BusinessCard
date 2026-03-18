@@ -1,59 +1,281 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# BFC Digital VCard System
+> Laravel 12 + Filament v4 — Digital Business Card Management
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Live URL:** https://vcard.bfcgroup.ph  
+**Admin Panel:** https://vcard.bfcgroup.ph/admin  
+**Public Card:** https://vcard.bfcgroup.ph/card/{slug}  
+**Server:** 10.10.0.107:8003 → Cloudflare Tunnel → vcard.bfcgroup.ph
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Tech Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Framework:** Laravel 12 + PHP 8.3
+- **Admin Panel:** Filament v4 (NOT v3 — installed via `composer require filament/filament` without version pin)
+- **Database:** MySQL 8.0 (Docker)
+- **Cache/Queue:** Redis (Docker)
+- **Web Server:** Apache 2.4 (Docker)
+- **Proxy:** Cloudflare Tunnel
+- **QR Code:** simplesoftwareio/simple-qrcode
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Project Structure
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+```
+/var/www/business-card/
+├── docker-compose.yml
+├── Dockerfile
+└── BusinessCard/          ← Laravel project root
+    ├── app/
+    │   ├── Filament/Resources/
+    │   │   ├── BusinessCardResource.php
+    │   │   └── BusinessCardResource/
+    │   │       ├── Pages/
+    │   │       │   ├── ListBusinessCards.php
+    │   │       │   ├── CreateBusinessCard.php
+    │   │       │   └── EditBusinessCard.php
+    │   │       ├── Schemas/
+    │   │       │   └── BusinessCardForm.php
+    │   │       └── Tables/
+    │   │           └── BusinessCardsTable.php
+    │   ├── Models/
+    │   │   ├── BusinessCard.php
+    │   │   └── User.php           ← Must implement FilamentUser!
+    │   └── Providers/
+    │       └── AppServiceProvider.php
+    ├── resources/views/card/
+    │   └── show.blade.php
+    ├── public/img/
+    │   ├── BFC.png                ← Company logo (header)
+    │   ├── BFC-White.png          ← White logo (card dark panel)
+    │   └── BFC.ico                ← Favicon
+    ├── bootstrap/app.php          ← trustProxies config
+    ├── config/database.php        ← SSL fix for MySQL
+    └── routes/web.php
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-## Laravel Sponsors
+## Fresh Deployment Steps
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### 1. Clone and navigate
+```bash
+cd /var/www/business-card
+git clone <repo-url> BusinessCard
+```
 
-### Premium Partners
+### 2. Build and start containers
+```bash
+sudo docker compose up -d
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### 3. Enter the container
+```bash
+sudo docker compose exec app bash
+```
 
-## Contributing
+### 4. Install dependencies
+```bash
+composer install --optimize-autoloader --no-dev
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 5. Setup environment
+```bash
+cp .env.example .env
+nano .env
+```
 
-## Code of Conduct
+### 6. Run setup commands
+```bash
+php artisan key:generate
+php artisan migrate --force
+php artisan storage:link
+php artisan filament:assets
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 7. Create admin user
+```bash
+php artisan make:filament-user
+```
 
-## Security Vulnerabilities
+### 8. Restart cloudflared (outside container)
+```bash
+exit
+sudo systemctl restart cloudflared
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
 
-## License
+## Critical .env Values
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```env
+APP_NAME="BFC Digital VCard"
+APP_ENV=production
+APP_URL=https://vcard.bfcgroup.ph
+
+DB_CONNECTION=mysql
+DB_HOST=db                    # ← MUST be 'db' not '127.0.0.1'
+DB_PORT=3306
+DB_DATABASE=vcard_database
+DB_USERNAME=vcard_user
+DB_PASSWORD=vcard_password
+
+SESSION_DRIVER=database
+SESSION_DOMAIN=vcard.bfcgroup.ph
+SESSION_SECURE_COOKIE=true
+
+FILESYSTEM_DISK=local
+```
+
+---
+
+## Critical Code Fixes (DO NOT REMOVE)
+
+### 1. AppServiceProvider.php — Force HTTPS + Root URL
+```php
+public function boot(): void
+{
+    if (app()->environment('production')) {
+        \URL::forceRootUrl(config('app.url'));
+        \URL::forceScheme('https');
+    }
+}
+```
+**Why:** Laravel is behind Cloudflare tunnel. Without this, redirects go to `https://localhost:8003` instead of `https://vcard.bfcgroup.ph`.
+
+### 2. bootstrap/app.php — Trust Cloudflare Proxy
+```php
+->withMiddleware(function (Middleware $middleware): void {
+    $middleware->trustProxies(at: '*');
+})
+```
+**Why:** Laravel doesn't trust Cloudflare headers by default, causing mixed content and wrong URL generation.
+
+### 3. User.php — FilamentUser Interface (CRITICAL)
+```php
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
+
+class User extends Authenticatable implements FilamentUser
+{
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return true;
+    }
+}
+```
+**Why:** Filament v4 requires this interface. Without it, login succeeds but immediately returns 403.
+
+### 4. config/database.php — Disable MySQL SSL Verification
+```php
+'options' => extension_loaded('pdo_mysql') ? array_filter([
+    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+]) : [],
+```
+**Why:** MySQL 8.0 Docker image uses self-signed SSL certificate which Laravel rejects by default.
+
+---
+
+## Features
+
+- Business card CRUD via Filament v4 admin panel
+- Auto slug generation from employee name
+- Public card page at `/card/{slug}`
+- QR code generation per card (SVG format)
+- QR code lightbox — click to expand with dark overlay
+- Copy link with comic speech bubble "Copied! 🎉" effect
+- Web Share API for sharing to Viber, WhatsApp, Messenger
+- Save to Contacts — downloads `.vcf` vCard file
+- Employee photo upload with storage
+- Doodle background (chicken, chick, egg, pig icons)
+- Mouse proximity hover effect on doodle icons
+- Rate limiting on public routes (30 requests/minute)
+- Active/Inactive toggle per card (inactive returns 404)
+- Responsive mobile layout
+
+---
+
+## Card Design
+
+- **Font:** Poppins (Google Fonts CDN)
+- **Colors:** Orange `#ec891b`, Maroon `#ab0b37`
+- **Layout:** Landscape 1.75:1 ratio (like physical business card)
+- **Max width:** 900px
+- **Left panel:** Dark gradient with company logo and tagline
+- **Right panel:** Name, position, contacts, QR code, save button
+
+---
+
+## Routes
+
+| Method | URL | Description |
+|--------|-----|-------------|
+| GET | `/` | Redirects to `/admin` |
+| GET | `/admin` | Filament admin panel |
+| GET | `/card/{slug}` | Public business card view |
+| GET | `/card/{slug}/vcard` | Download .vcf contact file |
+
+---
+
+## Filament v4 Gotchas
+
+> These caused major issues during development. Keep in mind for future reference.
+
+- `Form` class moved to `Filament\Schemas\Schema`
+- `Section` moved to `Filament\Schemas\Components\Section`
+- `NavigationIcon` type is `string|\BackedEnum|null` not `?string`
+- All table actions are in `Filament\Actions\*` not `Filament\Tables\Actions\*`
+- Pages must use `namespace App\Filament\Resources\BusinessCardResource\Pages`
+- **User model MUST implement `FilamentUser` interface or login returns 403**
+
+---
+
+## Deployment Checklist
+
+- [ ] `DB_HOST=db` in `.env` (not 127.0.0.1)
+- [ ] `APP_URL=https://vcard.bfcgroup.ph` in `.env`
+- [ ] `APP_ENV=production` in `.env`
+- [ ] `SESSION_DOMAIN=vcard.bfcgroup.ph` in `.env`
+- [ ] `SESSION_SECURE_COOKIE=true` in `.env`
+- [ ] `forceRootUrl` + `forceScheme` in `AppServiceProvider.php`
+- [ ] `trustProxies(at: '*')` in `bootstrap/app.php`
+- [ ] `FilamentUser` interface on `User` model
+- [ ] MySQL SSL disabled in `config/database.php`
+- [ ] `php artisan storage:link` ran
+- [ ] `php artisan filament:assets` ran
+- [ ] `php artisan migrate --force` ran
+- [ ] Admin user created via `php artisan make:filament-user`
+- [ ] Logo files in `public/img/` (BFC.png, BFC-White.png, BFC.ico)
+- [ ] Cloudflared restarted after deployment
+
+---
+
+## Cloudflare Tunnel Config
+
+```yaml
+tunnel: 8dc5f5e7-77c7-43af-b5df-bb62556f5574
+credentials-file: /home/iverson/.cloudflared/8dc5f5e7-77c7-43af-b5df-bb62556f5574.json
+ingress:
+  - hostname: vcard.bfcgroup.ph
+    service: http://localhost:8003
+  - service: http_status:404
+```
+
+---
+
+## Docker Compose Ports
+
+| Port | Project |
+|------|---------|
+| 8001 | pansystem |
+| 8002 | crispportal |
+| 8003 | **vcard (this project)** |
+| 8005 | intellihatch |
+
+---
+
+*Built with 🐔🐷🥚🐣 by Iverson*
